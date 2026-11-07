@@ -85,12 +85,19 @@ window.__ModuleLoader__.load({
         let cancelled = false;
         (async () => {
           try {
-            const res = await fetch(`${location.origin}${ROUTE}`);
-            const value = await res.json();
+            // Document-relative: app-owned routes resolve against the page (http origin and the desktop scheme alike).
+            const res = await fetch(ROUTE.slice(1));
+            const text = await res.text();
+            let value;
+            try {
+              value = JSON.parse(text);
+            } catch {
+              throw new Error(`HTTP ${res.status}: ${text.slice(0, 120)}`);
+            }
             if (!res.ok) throw new Error(value?.error || `HTTP ${res.status}`);
             if (!cancelled) setForm({ ponytail: value.ponytail ?? 'off', caveman: value.caveman ?? 'off', ponytailText: value.ponytailText ?? '', cavemanText: value.cavemanText ?? '' });
-          } catch {
-            if (!cancelled) setError(t('loadError'));
+          } catch (loadFailure) {
+            if (!cancelled) setError(`${t('loadError')} (${String(loadFailure?.message ?? loadFailure)})`);
           }
         })();
         return () => { cancelled = true; };
@@ -105,7 +112,7 @@ window.__ModuleLoader__.load({
       const save = async () => {
         setBusy(true); setError(''); setStatus('');
         try {
-          const res = await fetch(`${location.origin}${ROUTE}`, {
+          const res = await fetch(ROUTE.slice(1), {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
