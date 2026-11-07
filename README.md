@@ -47,23 +47,27 @@
 
 ### ponytail 等级（懒高级开发）
 
+内置文本逐字取自上游 [ponytail SKILL.md](https://github.com/DietrichGebert/ponytail/blob/main/skills/ponytail/SKILL.md)：
+
 | 等级 | 内容 |
 |---|---|
 | `off` | 关闭 |
-| `lite` | 核心阶梯：能用现成的就不写新的；做完要说清跳过了什么 |
-| `full` | 阶梯 + 先读作用域 + 最小完整改动 + 注释/自测/根因修复规则 |
-| `ultra` | full + 写之前先扫现有代码、等大时选边界更正确的方案、明确拒绝投机性泛化 |
+| `lite` | 按要求构建，用一行点名更小的选项让用户选 |
+| `full` | 上游完整规则：先读作用域、最小完整改动阶梯、注释/自测/根因修复、"Never cut" 清单 |
+| `ultra` | full + 质疑请求本身：需求撑不住的部分先反驳再动手 |
 
 ### caveman 等级（极简输出）
 
+内置文本逐字取自上游 [pi-caveman caveman.ts](https://github.com/jonjonrankin/pi-caveman/blob/main/extensions/caveman.ts)（BASE + INTENSITY + SAFETY，按上游同等级拼装）：
+
 | 等级 | 内容 |
 |---|---|
 | `off` | 关闭 |
-| `lite` | 保留完整句子，去掉废话和客套 |
-| `full` | 允许短句、去冠词，`[ thing] [action] [reason]` 模式 |
-| `ultra` | full + `->` 表示因果、激进缩写、一条一个想法 |
+| `lite` | 保留冠词和完整句子，去废话去客套，紧凑高级工程师风格 |
+| `full` | 上游 BASE：去冠词、短句 OK，`[thing] [action] [reason]` 模式，正反示例 |
+| `ultra` | full + 缩写（DB/auth/config…）、去连词、`→` 表因果 |
 
-caveman 所有等级都带 **safety override**：安全警告、不可逆/破坏性操作、需要原样复制的报错、用户困惑时自动恢复自然语言。
+caveman 所有等级都带上游 **SAFETY**：安全警告、不可逆操作确认、用户困惑时自动恢复自然语言；"stop caveman" / "normal mode" 恢复。
 
 ## 安装
 
