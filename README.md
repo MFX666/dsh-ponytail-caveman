@@ -79,7 +79,7 @@ plugin_manager install_bundle target=<本目录绝对路径>
 package.json       bundle 清单（dsh.bundle.patch + dsh.client 声明）
 cordis.patch.yml   插入 dsh-ponytail-caveman 行及默认配置
 index.js           Host 插件：Config schema + section 注册 + 会话起始消息 + 配置路由
-client.js          插件详情页配置面板（设置 → 内置插件 → 本插件）
+client.js          插件详情页配置面板（plugins.bundle.config，同 voice-input 范式）
 locale/en.json     英文标题/描述（Plugin Manager 显示）
 locale/zh.json     中文标题/描述
 icon.svg           原创图标（双气泡：代码风格 + 极简输出）

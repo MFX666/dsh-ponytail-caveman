@@ -1,12 +1,13 @@
 /**
  * dsh-ponytail-caveman — Client half (plugin detail page config section).
- * Registers a "plugins.item" occupant so the plugin's own detail page in
- * Settings → 内置插件 renders a config panel: two mode selects and two
- * optional custom-rules textareas, persisted through the Host half's
+ * Registers a "plugins.bundle.config" occupant — the same slot the shipped
+ * voice-input bundle uses for its config panel — so the plugin's own detail
+ * page in Settings → 内置插件 renders the config cards: two mode selects and
+ * two optional custom-rules textareas, persisted through the Host half's
  * /api/dsh-ponytail-caveman/config route (config editor write-back).
  *
- * Note: slot occupants receive business props only ({ view, form }) — no
- * ctx — so the component takes ctx through this factory's closure.
+ * Note: slot occupants receive business props only — no ctx — so the
+ * component takes ctx through the registered `inject`.
  */
 window.__ModuleLoader__.load({
   id: '@local/dsh-ponytail-caveman',
@@ -16,6 +17,7 @@ window.__ModuleLoader__.load({
 
     const LEVELS = ['off', 'lite', 'full', 'ultra'];
     const ROUTE = '/api/dsh-ponytail-caveman/config';
+    const NS = 'dshPonytailCaveman';
     const PACKAGE_ID = '@local/dsh-ponytail-caveman';
 
     const DICTS = {
@@ -67,7 +69,7 @@ window.__ModuleLoader__.load({
 .dpc-error{font-size:12px;color:var(--dsw-alias-state-error-primary);white-space:pre-wrap;}
 `;
 
-    function ConfigPanel({ view, ctx }) {
+    function ConfigPanel({ ctx }) {
       const [, setTick] = React.useState(0);
       const rawLocale = ctx.locale?.getSnapshot?.().locale ?? 'en';
       const lang = String(rawLocale).toLowerCase().startsWith('zh') ? 'zh' : 'en';
@@ -80,7 +82,6 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState('');
 
       React.useEffect(() => {
-        if (view !== 'page') return;
         let cancelled = false;
         (async () => {
           try {
@@ -93,9 +94,7 @@ window.__ModuleLoader__.load({
           }
         })();
         return () => { cancelled = true; };
-      }, [view]);
-
-      if (view !== 'page') return null; // the card/detail-description "summary" view contributes nothing
+      }, []);
 
       const set = (key) => (event) => {
         const value = event.target.value;
@@ -175,16 +174,18 @@ window.__ModuleLoader__.load({
           document.head.append(el);
           disposeStyles = () => el.remove();
         }
-        const offEn = ctx.locale?.register?.('dshPonytailCaveman', 'en', DICTS.en);
-        const offZh = ctx.locale?.register?.('dshPonytailCaveman', 'zh', DICTS.zh);
-        // The plugin manager page filters this list slot with `only: item.id`; bundle items are keyed by package name.
-        const disposeItem = ctx.slots.inject('plugins.item', () =>
-          ctx.slots.register(
-            { name: 'plugins.item', id: PACKAGE_ID, order: 10, label: () => DICTS[(String(ctx.locale?.getSnapshot?.().locale ?? 'en')).toLowerCase().startsWith('zh') ? 'zh' : 'en'].summary },
-            (props) => ConfigPanel({ ...props, ctx }),
-          ));
+        const offEn = ctx.locale?.register?.(NS, 'en', DICTS.en);
+        const offZh = ctx.locale?.register?.(NS, 'zh', DICTS.zh);
+        // The config section of this bundle's own detail page (same slot as the shipped voice-input bundle).
+        const disposeConfig = ctx.slots.inject('plugins.bundle.config', () =>
+          ctx.slots.register({
+            name: 'plugins.bundle.config',
+            key: PACKAGE_ID,
+            locale: NS,
+            inject: () => ({ ctx }),
+          }, ConfigPanel));
         return () => {
-          disposeItem?.();
+          disposeConfig?.();
           offZh?.(); offEn?.();
           disposeStyles?.();
         };
