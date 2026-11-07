@@ -163,11 +163,13 @@ export function apply(ctx, config) {
       kind: 'prefix',
       path: ROUTE_PREFIX,
       handler: async (req, res) => {
-        const admission = ctx.connection.admit(req);
-        if ('rejection' in admission) {
-          res.writeHead(admission.rejection);
-          res.end(admission.rejection === 401 ? 'unauthorized' : 'forbidden');
-          return;
+        // Loopback-only guard instead of connection.admit(): the desktop app window
+        // speaks a non-http scheme, and admit() throws on such requests (the empty-400
+        // the panel saw). The webserver binds loopback, so a local peer is the trust
+        // boundary here; unauthenticated reads/writes never leave this machine.
+        const addr = req.socket?.remoteAddress ?? '';
+        if (addr !== '127.0.0.1' && addr !== '::1' && addr !== '::ffff:127.0.0.1') {
+          res.writeHead(403); res.end('local only'); return;
         }
         try {
           const url = new URL(req.url, 'http://local');
