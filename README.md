@@ -1,4 +1,4 @@
-# session-prompts
+# dsh-ponytail-caveman
 
 一个 DSH（DeepSeek Harness）Host 插件：在**每个会话开始时向系统提示词注入工作风格提示**，相当于其他 Agent 工具里的 SessionStart hook。
 
@@ -11,8 +11,8 @@
 
 插件通过 `ctx.systemPrompt.section()` 注册两个全局提示词 section：
 
-- `session-prompts:ponytail`（排序 450，位于 persona 之后、plan policy 之前）
-- `session-prompts:caveman`（排序 460）
+- `dsh-ponytail-caveman:ponytail`（排序 450，位于 persona 之后、plan policy 之前）
+- `dsh-ponytail-caveman:caveman`（排序 460）
 
 系统提示词在**每一次模型请求前**重新组装，全局 section 对当前进程内所有 Agent（根会话与子 Agent）生效——修改配置后立即对新会话和已有会话生效，无需重启。
 
@@ -21,7 +21,7 @@
 推荐方式：在**用户层** `$DSH_PROFILE_DIR/cordis.patch.yml` 中加一条覆盖行（优先级高于 bundle 层，改完即时生效，升级不丢）：
 
 ```yaml
-- id: session-prompts
+- id: dsh-ponytail-caveman
   config:
     ponytail: full   # off | lite | full | ultra
     caveman: off     # off | lite | full | ultra
@@ -30,8 +30,8 @@
 或者直接修改本目录的 `cordis.patch.yml` 后重新安装（remove_bundle + install_bundle）使 bundle 层配置重新加载：
 
 ```yaml
-- id: session-prompts
-  name: '@local/session-prompts'
+- id: dsh-ponytail-caveman
+  name: '@local/dsh-ponytail-caveman'
   config:
     ponytail: full   # off | lite | full | ultra
     caveman: off     # off | lite | full | ultra
@@ -69,7 +69,7 @@ plugin_manager install_bundle target=<本目录绝对路径>
 
 ```
 package.json       bundle 清单（dsh.bundle.patch 指向 cordis.patch.yml）
-cordis.patch.yml   插入 session-prompts 行及默认配置
+cordis.patch.yml   插入 dsh-ponytail-caveman 行及默认配置
 index.js           Host 插件：Config schema + section 注册
 locale/en.json     英文标题/描述（Plugin Manager 显示）
 locale/zh.json     中文标题/描述

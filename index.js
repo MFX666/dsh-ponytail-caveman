@@ -15,7 +15,7 @@
  */
 import z from '@deepseek-ai/schemastery';
 
-const name = 'session-prompts';
+const name = 'dsh-ponytail-caveman';
 const inject = ['systemPrompt'];
 
 /** Section placement: after deployment persona (0), before plan policy (500). */

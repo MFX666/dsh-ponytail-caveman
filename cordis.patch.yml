@@ -1,6 +1,6 @@
 - insert:
-    - id: session-prompts
-      name: '@local/session-prompts'
+    - id: dsh-ponytail-caveman
+      name: '@local/dsh-ponytail-caveman'
       config:
         # ponytail: off | lite | full | ultra —— 懒高级开发（最少代码解决问题）
         # caveman:  off | lite | full | ultra —— 穴居人极简输出（省 token）
