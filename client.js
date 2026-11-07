@@ -1,9 +1,12 @@
 /**
- * dsh-ponytail-caveman — Client half (settings page).
- * Registers one page in the Settings panel ("settings.section" slot) styled
- * after the host's speech-input page: one card per mode with a level select
- * and an optional custom-rules textarea, plus a save action that persists
- * through the Host half's /api/dsh-ponytail-caveman/config route.
+ * dsh-ponytail-caveman — Client half (plugin detail page config section).
+ * Registers a "plugins.item" occupant so the plugin's own detail page in
+ * Settings → 内置插件 renders a config panel: two mode selects and two
+ * optional custom-rules textareas, persisted through the Host half's
+ * /api/dsh-ponytail-caveman/config route (config editor write-back).
+ *
+ * Note: slot occupants receive business props only ({ view, form }) — no
+ * ctx — so the component takes ctx through this factory's closure.
  */
 window.__ModuleLoader__.load({
   id: '@local/dsh-ponytail-caveman',
@@ -13,10 +16,10 @@ window.__ModuleLoader__.load({
 
     const LEVELS = ['off', 'lite', 'full', 'ultra'];
     const ROUTE = '/api/dsh-ponytail-caveman/config';
+    const PACKAGE_ID = '@local/dsh-ponytail-caveman';
 
     const DICTS = {
       en: {
-        title: 'Session prompts',
         intro: 'Working-style prompts injected into every session: ponytail keeps changes minimal, caveman makes replies terse. Both reach the system prompt and a visible message at each session start.',
         ponytail: 'Ponytail mode (lazy senior dev)',
         caveman: 'Caveman mode (terse output)',
@@ -26,12 +29,12 @@ window.__ModuleLoader__.load({
         textPlaceholder: 'Leave empty to use the built-in rules of the selected level.',
         save: 'Save',
         saving: 'Saving…',
-        saved: 'Saved — applies to new sessions immediately; open sessions get the system-prompt update at once.',
+        saved: 'Saved — new sessions get the visible injection immediately; open sessions receive the system-prompt update at once.',
         loadError: 'Could not load the current configuration.',
-        offHint: 'Off: neither mode injects anything.',
+        offHint: 'Both modes are off: nothing is injected.',
+        summary: 'Ponytail and caveman working styles, configurable on the plugin page.',
       },
       zh: {
-        title: '会话提示词',
         intro: '注入到每个会话的工作风格提示：ponytail 让改动尽量少，caveman 让回复尽量短。两者同时写入系统提示词和每次会话开头的可见消息。',
         ponytail: 'Ponytail 模式（懒高级开发）',
         caveman: 'Caveman 模式（极简输出）',
@@ -41,15 +44,16 @@ window.__ModuleLoader__.load({
         textPlaceholder: '留空使用所选等级的内置规则文本。',
         save: '保存',
         saving: '保存中…',
-        saved: '已保存——新会话立即生效；已开会话的系统提示词即时更新。',
+        saved: '已保存——新会话立即出现可见注入；已开会话的系统提示词即时更新。',
         loadError: '无法加载当前配置。',
-        offHint: '关闭：两个模式都不注入。',
+        offHint: '两个模式都关闭：不注入任何内容。',
+        summary: 'Ponytail 与 caveman 工作风格，可在插件页配置。',
       },
     };
 
     const css = `
-.dpc-page{max-width:680px;display:flex;flex-direction:column;gap:16px;color:var(--dsw-alias-label-primary);}
-.dpc-card{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;}
+.dpc-page{display:flex;flex-direction:column;gap:14px;color:var(--dsw-alias-label-primary);}
+.dpc-card{background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
 .dpc-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .dpc-label{font-size:13px;font-weight:600;}
 .dpc-select{min-width:140px;padding:6px 10px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);color:inherit;font-size:13px;}
@@ -63,7 +67,7 @@ window.__ModuleLoader__.load({
 .dpc-error{font-size:12px;color:var(--dsw-alias-state-error-primary);white-space:pre-wrap;}
 `;
 
-    function SettingsPage({ ctx }) {
+    function ConfigPanel({ view, ctx }) {
       const [, setTick] = React.useState(0);
       const rawLocale = ctx.locale?.getSnapshot?.().locale ?? 'en';
       const lang = String(rawLocale).toLowerCase().startsWith('zh') ? 'zh' : 'en';
@@ -76,6 +80,7 @@ window.__ModuleLoader__.load({
       const [error, setError] = React.useState('');
 
       React.useEffect(() => {
+        if (view !== 'page') return;
         let cancelled = false;
         (async () => {
           try {
@@ -88,7 +93,9 @@ window.__ModuleLoader__.load({
           }
         })();
         return () => { cancelled = true; };
-      }, []);
+      }, [view]);
+
+      if (view !== 'page') return null; // the card/detail-description "summary" view contributes nothing
 
       const set = (key) => (event) => {
         const value = event.target.value;
@@ -123,31 +130,34 @@ window.__ModuleLoader__.load({
 
       return h('div', { className: 'dpc-page' },
         h('p', { className: 'dpc-intro' }, t('intro')),
-        error !== '' && form === null ? h('p', { className: 'dpc-error' }, error) : null,
-        form !== null && h(React.Fragment, null,
-          h('div', { className: 'dpc-card' },
-            h('div', { className: 'dpc-row' },
-              h('label', { className: 'dpc-label', htmlFor: 'dpc-ponytail' }, t('ponytail')),
-              h('select', { id: 'dpc-ponytail', className: 'dpc-select', value: form.ponytail, onChange: set('ponytail') }, LEVELS.map(levelOption)),
-            ),
-            h('div', { className: 'dpc-row' },
-              h('label', { className: 'dpc-label', htmlFor: 'dpc-caveman' }, t('caveman')),
-              h('select', { id: 'dpc-caveman', className: 'dpc-select', value: form.caveman, onChange: set('caveman') }, LEVELS.map(levelOption)),
-            ),
-            h('p', { className: 'dpc-hint' }, form.ponytail === 'off' && form.caveman === 'off' ? t('offHint') : ''),
-          ),
-          h('div', { className: 'dpc-card' },
-            h('label', { className: 'dpc-label', htmlFor: 'dpc-ponytail-text' }, t('ponytailText')),
-            h('textarea', { id: 'dpc-ponytail-text', className: 'dpc-text', value: form.ponytailText, onChange: set('ponytailText'), placeholder: t('textPlaceholder'), spellCheck: false }),
-            h('label', { className: 'dpc-label', htmlFor: 'dpc-caveman-text' }, t('cavemanText')),
-            h('textarea', { id: 'dpc-caveman-text', className: 'dpc-text', value: form.cavemanText, onChange: set('cavemanText'), placeholder: t('textPlaceholder'), spellCheck: false }),
-          ),
-          h('div', { className: 'dpc-row' },
-            h('button', { className: 'dpc-save', onClick: save, disabled: busy }, busy ? t('saving') : t('save')),
-            h('span', { className: 'dpc-status', 'aria-live': 'polite' }, status),
-          ),
-          error !== '' ? h('p', { className: 'dpc-error' }, error) : null,
-        ),
+        form === null && error === ''
+          ? null
+          : error !== '' && form === null
+            ? h('p', { className: 'dpc-error' }, error)
+            : h(React.Fragment, null,
+                h('div', { className: 'dpc-card' },
+                  h('div', { className: 'dpc-row' },
+                    h('label', { className: 'dpc-label', htmlFor: 'dpc-ponytail' }, t('ponytail')),
+                    h('select', { id: 'dpc-ponytail', className: 'dpc-select', value: form.ponytail, onChange: set('ponytail') }, LEVELS.map(levelOption)),
+                  ),
+                  h('div', { className: 'dpc-row' },
+                    h('label', { className: 'dpc-label', htmlFor: 'dpc-caveman' }, t('caveman')),
+                    h('select', { id: 'dpc-caveman', className: 'dpc-select', value: form.caveman, onChange: set('caveman') }, LEVELS.map(levelOption)),
+                  ),
+                  form.ponytail === 'off' && form.caveman === 'off' ? h('p', { className: 'dpc-hint' }, t('offHint')) : null,
+                ),
+                h('div', { className: 'dpc-card' },
+                  h('label', { className: 'dpc-label', htmlFor: 'dpc-ponytail-text' }, t('ponytailText')),
+                  h('textarea', { id: 'dpc-ponytail-text', className: 'dpc-text', value: form.ponytailText, onChange: set('ponytailText'), placeholder: t('textPlaceholder'), spellCheck: false }),
+                  h('label', { className: 'dpc-label', htmlFor: 'dpc-caveman-text' }, t('cavemanText')),
+                  h('textarea', { id: 'dpc-caveman-text', className: 'dpc-text', value: form.cavemanText, onChange: set('cavemanText'), placeholder: t('textPlaceholder'), spellCheck: false }),
+                ),
+                h('div', { className: 'dpc-row' },
+                  h('button', { className: 'dpc-save', onClick: save, disabled: busy }, busy ? t('saving') : t('save')),
+                  h('span', { className: 'dpc-status', 'aria-live': 'polite' }, status),
+                ),
+                error !== '' ? h('p', { className: 'dpc-error' }, error) : null,
+              ),
       );
     }
 
@@ -167,13 +177,14 @@ window.__ModuleLoader__.load({
         }
         const offEn = ctx.locale?.register?.('dshPonytailCaveman', 'en', DICTS.en);
         const offZh = ctx.locale?.register?.('dshPonytailCaveman', 'zh', DICTS.zh);
-        const disposeSection = ctx.slots.inject('settings.section', () =>
+        // The plugin manager page filters this list slot with `only: item.id`; bundle items are keyed by package name.
+        const disposeItem = ctx.slots.inject('plugins.item', () =>
           ctx.slots.register(
-            { name: 'settings.section', id: 'dsh-ponytail-caveman', order: 95, label: () => DICTS[(String(ctx.locale?.getSnapshot?.().locale ?? 'en')).toLowerCase().startsWith('zh') ? 'zh' : 'en'].title },
-            SettingsPage,
+            { name: 'plugins.item', id: PACKAGE_ID, order: 10, label: () => DICTS[(String(ctx.locale?.getSnapshot?.().locale ?? 'en')).toLowerCase().startsWith('zh') ? 'zh' : 'en'].summary },
+            (props) => ConfigPanel({ ...props, ctx }),
           ));
         return () => {
-          disposeSection?.();
+          disposeItem?.();
           offZh?.(); offEn?.();
           disposeStyles?.();
         };

@@ -26,7 +26,7 @@ import z from '@deepseek-ai/schemastery';
 const name = 'dsh-ponytail-caveman';
 const inject = ['systemPrompt', 'webServer', 'configEditor'];
 
-const ROUTE_PREFIX = '/api/dsh-ponytail-caveman/';
+const ROUTE_PREFIX = '/api/dsh-ponytail-caveman'; // no trailing slash: the webserver prefix match is startsWith(prefix + '/')
 const LEVELS = new Set(['off', 'lite', 'full', 'ultra']);
 const MAX_TEXT_CHARS = 20000;
 

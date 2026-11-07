@@ -18,7 +18,7 @@
 
 ## 配置
 
-**推荐方式：设置页。** 打开 DSH 设置（侧边栏底部齿轮）→「会话提示词」页面：
+**推荐方式：插件详情页。** 打开 DSH 设置 →「内置插件」→「会话提示词注入」详情页，源文档下方即配置面板：
 
 - 两个模式下拉：`off | lite | full | ultra`
 - 两个可选自定义规则文本框：留空用所选等级的内置文本，填写则覆盖内置文本
@@ -79,7 +79,7 @@ plugin_manager install_bundle target=<本目录绝对路径>
 package.json       bundle 清单（dsh.bundle.patch + dsh.client 声明）
 cordis.patch.yml   插入 dsh-ponytail-caveman 行及默认配置
 index.js           Host 插件：Config schema + section 注册 + 会话起始消息 + 配置路由
-client.js          Web 设置页（Settings → 会话提示词）
+client.js          插件详情页配置面板（设置 → 内置插件 → 本插件）
 locale/en.json     英文标题/描述（Plugin Manager 显示）
 locale/zh.json     中文标题/描述
 icon.svg           原创图标（双气泡：代码风格 + 极简输出）
