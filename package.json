@@ -6,11 +6,13 @@
   "description": "Injects configurable working-style prompts (ponytail lazy senior dev, caveman terse output) into every session's system prompt.",
   "exports": {
     ".": "./index.js",
+    "./client": "./client.js",
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
   "files": [
     "index.js",
+    "client.js",
     "cordis.patch.yml",
     "locale/*.json",
     "icon.svg",
@@ -21,8 +23,13 @@
     "@deepseek-ai/schemastery": "~3.19.0"
   },
   "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings"
+      ]
     }
   }
 }

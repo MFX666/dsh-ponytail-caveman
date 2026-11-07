@@ -18,13 +18,21 @@
 
 ## 配置
 
-推荐方式：在**用户层** `$DSH_PROFILE_DIR/cordis.patch.yml` 中加一条覆盖行（优先级高于 bundle 层，改完即时生效，升级不丢）：
+**推荐方式：设置页。** 打开 DSH 设置（侧边栏底部齿轮）→「会话提示词」页面：
+
+- 两个模式下拉：`off | lite | full | ultra`
+- 两个可选自定义规则文本框：留空用所选等级的内置文本，填写则覆盖内置文本
+- 保存后写入用户层配置（`$DSH_PROFILE_DIR/cordis.patch.yml` 的覆盖行），插件自动重启，对新会话与已有会话即时生效
+
+等效的配置文件方式——在用户层 `cordis.patch.yml` 加覆盖行（优先级高于 bundle 层，改完即时生效，升级不丢）：
 
 ```yaml
 - id: dsh-ponytail-caveman
   config:
-    ponytail: full   # off | lite | full | ultra
-    caveman: off     # off | lite | full | ultra
+    ponytail: full      # off | lite | full | ultra
+    caveman: full       # off | lite | full | ultra
+    ponytailText: ""    # 可选，自定义 ponytail 规则文本
+    cavemanText: ""     # 可选，自定义 caveman 规则文本
 ```
 
 或者直接修改本目录的 `cordis.patch.yml` 后重新安装（remove_bundle + install_bundle）使 bundle 层配置重新加载：
@@ -34,7 +42,7 @@
   name: '@local/dsh-ponytail-caveman'
   config:
     ponytail: full   # off | lite | full | ultra
-    caveman: off     # off | lite | full | ultra
+    caveman: full    # off | lite | full | ultra
 ```
 
 ### ponytail 等级（懒高级开发）
@@ -68,9 +76,10 @@ plugin_manager install_bundle target=<本目录绝对路径>
 ## 文件结构
 
 ```
-package.json       bundle 清单（dsh.bundle.patch 指向 cordis.patch.yml）
+package.json       bundle 清单（dsh.bundle.patch + dsh.client 声明）
 cordis.patch.yml   插入 dsh-ponytail-caveman 行及默认配置
-index.js           Host 插件：Config schema + section 注册
+index.js           Host 插件：Config schema + section 注册 + 会话起始消息 + 配置路由
+client.js          Web 设置页（Settings → 会话提示词）
 locale/en.json     英文标题/描述（Plugin Manager 显示）
 locale/zh.json     中文标题/描述
 icon.svg           原创图标（双气泡：代码风格 + 极简输出）

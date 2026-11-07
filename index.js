@@ -24,7 +24,11 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import z from '@deepseek-ai/schemastery';
 
 const name = 'dsh-ponytail-caveman';
-const inject = ['systemPrompt'];
+const inject = ['systemPrompt', 'webServer', 'configEditor'];
+
+const ROUTE_PREFIX = '/api/dsh-ponytail-caveman/';
+const LEVELS = new Set(['off', 'lite', 'full', 'ultra']);
+const MAX_TEXT_CHARS = 20000;
 
 /** Section placement: after deployment persona (0), before plan policy (500). */
 const STYLE_SECTION_ORDER = 450;
@@ -38,6 +42,14 @@ export const Config = z.object({
     .union([z.const('off'), z.const('lite'), z.const('full'), z.const('ultra')])
     .default('off')
     .description('Caveman mode: terse output that keeps technical substance and cuts filler tokens. off disables it.'),
+  ponytailText: z
+    .string()
+    .default('')
+    .description('Optional custom ponytail rules; empty uses the built-in text of the chosen level.'),
+  cavemanText: z
+    .string()
+    .default('')
+    .description('Optional custom caveman rules; empty uses the built-in text of the chosen level.'),
 }).description('Working-style prompts injected into every session system prompt.');
 
 const PONYTAIL_LITE = `SESSION STYLE: PONYTAIL (lazy senior dev) — level: lite
@@ -91,10 +103,34 @@ const CAVEMAN_PROMPTS = { lite: CAVEMAN_LITE, full: CAVEMAN_FULL, ultra: CAVEMAN
 /** Session-start sources that (re-)announce the style message; `resume` is skipped because the earlier message is still durable in the log. */
 const ANNOUNCE_SOURCES = new Set(['startup', 'clear', 'compaction']);
 
+/** Read one JSON request body with a size guard. */
+const readBody = (req) => new Promise((resolve, reject) => {
+  const chunks = [];
+  let size = 0;
+  req.on('data', (chunk) => {
+    size += chunk.length;
+    if (size > 1_000_000) { reject(new Error('body too large')); req.destroy(); return; }
+    chunks.push(chunk);
+  });
+  req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+  req.on('error', reject);
+});
+
+const json = (res, status, value) => {
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify(value));
+};
+
 export function apply(ctx, config) {
+  // `off` disables the mode entirely; custom non-empty text overrides the level's built-in text.
+  const rulesText = (level, customText, builtIn) => {
+    if (level === 'off') return false;
+    if (customText.trim() !== '') return customText;
+    return builtIn[level] ?? builtIn.full;
+  };
   const styleText = [
-    config.ponytail !== 'off' && (PONYTAIL_PROMPTS[config.ponytail] ?? PONYTAIL_FULL),
-    config.caveman !== 'off' && (CAVEMAN_PROMPTS[config.caveman] ?? CAVEMAN_FULL),
+    rulesText(config.ponytail, config.ponytailText ?? '', PONYTAIL_PROMPTS),
+    rulesText(config.caveman, config.cavemanText ?? '', CAVEMAN_PROMPTS),
   ].filter(Boolean).join('\n\n');
   if (styleText !== '') {
     ctx.effect(
@@ -121,6 +157,56 @@ export function apply(ctx, config) {
       }
     }),
     `announce ${name} style on agent/created`,
+  );
+  ctx.effect(
+    () => ctx.webServer.register({
+      kind: 'prefix',
+      path: ROUTE_PREFIX,
+      handler: async (req, res) => {
+        const admission = ctx.connection.admit(req);
+        if ('rejection' in admission) {
+          res.writeHead(admission.rejection);
+          res.end(admission.rejection === 401 ? 'unauthorized' : 'forbidden');
+          return;
+        }
+        try {
+          const url = new URL(req.url, 'http://local');
+          if (req.method === 'GET' && url.pathname === `${ROUTE_PREFIX}config`) {
+            return json(res, 200, {
+              ponytail: config.ponytail,
+              caveman: config.caveman,
+              ponytailText: config.ponytailText ?? '',
+              cavemanText: config.cavemanText ?? '',
+            });
+          }
+          if (req.method === 'POST' && url.pathname === `${ROUTE_PREFIX}config`) {
+            const body = JSON.parse((await readBody(req)) || '{}');
+            const patch = {};
+            for (const key of ['ponytail', 'caveman']) {
+              if (body[key] !== undefined) {
+                if (!LEVELS.has(body[key])) throw new Error(`${key} must be one of off/lite/full/ultra`);
+                patch[key] = body[key];
+              }
+            }
+            for (const key of ['ponytailText', 'cavemanText']) {
+              if (body[key] !== undefined) {
+                if (typeof body[key] !== 'string' || body[key].length > MAX_TEXT_CHARS) throw new Error(`${key} must be a string of at most ${MAX_TEXT_CHARS} characters`);
+                patch[key] = body[key];
+              }
+            }
+            const entry = ctx.fiber.entry;
+            const editor = ctx.get('configEditor');
+            if (entry === undefined || editor === undefined) throw new Error('configuration cannot be saved in this profile');
+            await editor.edit(entry, (current) => ({ ...current, ...patch }));
+            return json(res, 200, { saved: true, ...patch });
+          }
+          json(res, 404, { error: 'not found' });
+        } catch (error) {
+          json(res, 400, { error: String(error?.message ?? error) });
+        }
+      },
+    }),
+    'register config routes',
   );
 }
 
