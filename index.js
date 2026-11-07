@@ -171,7 +171,7 @@ export function apply(ctx, config) {
         }
         try {
           const url = new URL(req.url, 'http://local');
-          if (req.method === 'GET' && url.pathname === `${ROUTE_PREFIX}config`) {
+          if (req.method === 'GET' && url.pathname === `${ROUTE_PREFIX}/config`) {
             return json(res, 200, {
               ponytail: config.ponytail,
               caveman: config.caveman,
@@ -179,7 +179,7 @@ export function apply(ctx, config) {
               cavemanText: config.cavemanText ?? '',
             });
           }
-          if (req.method === 'POST' && url.pathname === `${ROUTE_PREFIX}config`) {
+          if (req.method === 'POST' && url.pathname === `${ROUTE_PREFIX}/config`) {
             const body = JSON.parse((await readBody(req)) || '{}');
             const patch = {};
             for (const key of ['ponytail', 'caveman']) {
