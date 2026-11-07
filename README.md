@@ -9,12 +9,12 @@
 
 ## 工作原理
 
-插件通过 `ctx.systemPrompt.section()` 注册两个全局提示词 section：
+插件通过两层机制注入，模仿参考插件的 SessionStart hook 行为：
 
-- `dsh-ponytail-caveman:ponytail`（排序 450，位于 persona 之后、plan policy 之前）
-- `dsh-ponytail-caveman:caveman`（排序 460）
+1. **轨迹可见消息**：监听 `agent/created`（新会话、clear、compaction 时机），向会话日志提交一条 `user/message`（来源标记 `dsh-ponytail-caveman`），它会出现在对话轨迹顶部，并进入模型的第一步请求。resume 不重复注入（早先的消息仍在日志里）。
+2. **系统提示词 section**：通过 `ctx.systemPrompt.section()` 注册 `dsh-ponytail-caveman:style`（排序 450，位于 persona 之后、plan policy 之前），每次模型请求前重新组装——即使长会话 compaction 折叠了第 1 条消息，风格规则依然生效。
 
-系统提示词在**每一次模型请求前**重新组装，全局 section 对当前进程内所有 Agent（根会话与子 Agent）生效——修改配置后立即对新会话和已有会话生效，无需重启。
+两者对当前进程内所有 Agent（根会话与子 Agent）生效；修改配置后插件重启，对新会话和已有会话即时生效，无需重启。
 
 ## 配置
 

@@ -8,19 +8,26 @@
  * - pi-caveman (https://github.com/jonjonrankin/pi-caveman) — "caveman": terse output that
  *   keeps technical substance while cutting filler tokens.
  *
- * Mechanism: registers ordered sections through `ctx.systemPrompt.section()`.
- * The section text enters the system prompt assembled before every model step
- * of every agent (root sessions and subagents alike), so a level change in the
- * profile patch applies to existing and future sessions without restart.
+ * Mechanism: two layers.
+ * - `ctx.systemPrompt.section()` registers ordered sections, so the text is
+ *   re-assembled into every model request of every agent (root sessions and
+ *   subagents alike) and survives compaction.
+ * - An `agent/created` listener commits a visible `user/message` at session
+ *   start (fresh creation, clear, compaction — not resume, where the earlier
+ *   message is already durable), so the injection appears in the session
+ *   trajectory. If that append is rejected, it degrades to `agent.inject()`,
+ *   which is durable but transcript-invisible.
+ * A level change in the profile patch restarts the plugin and applies to
+ * existing and future sessions without restart.
  */
+import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import z from '@deepseek-ai/schemastery';
 
 const name = 'dsh-ponytail-caveman';
 const inject = ['systemPrompt'];
 
 /** Section placement: after deployment persona (0), before plan policy (500). */
-const PONYTAIL_ORDER = 450;
-const CAVEMAN_ORDER = 460;
+const STYLE_SECTION_ORDER = 450;
 
 export const Config = z.object({
   ponytail: z
@@ -81,28 +88,40 @@ ${CAVEMAN_SAFETY}`;
 const PONYTAIL_PROMPTS = { lite: PONYTAIL_LITE, full: PONYTAIL_FULL, ultra: PONYTAIL_ULTRA };
 const CAVEMAN_PROMPTS = { lite: CAVEMAN_LITE, full: CAVEMAN_FULL, ultra: CAVEMAN_ULTRA };
 
+/** Session-start sources that (re-)announce the style message; `resume` is skipped because the earlier message is still durable in the log. */
+const ANNOUNCE_SOURCES = new Set(['startup', 'clear', 'compaction']);
+
 export function apply(ctx, config) {
-  const sections = [];
-  if (config.ponytail !== 'off') {
-    sections.push({
-      name: `${name}:ponytail`,
-      order: PONYTAIL_ORDER,
-      text: PONYTAIL_PROMPTS[config.ponytail] ?? PONYTAIL_FULL,
-    });
-  }
-  if (config.caveman !== 'off') {
-    sections.push({
-      name: `${name}:caveman`,
-      order: CAVEMAN_ORDER,
-      text: CAVEMAN_PROMPTS[config.caveman] ?? CAVEMAN_FULL,
-    });
-  }
-  for (const section of sections) {
+  const styleText = [
+    config.ponytail !== 'off' && (PONYTAIL_PROMPTS[config.ponytail] ?? PONYTAIL_FULL),
+    config.caveman !== 'off' && (CAVEMAN_PROMPTS[config.caveman] ?? CAVEMAN_FULL),
+  ].filter(Boolean).join('\n\n');
+  if (styleText !== '') {
     ctx.effect(
-      () => ctx.systemPrompt.section(section),
-      `register system prompt section ${section.name}`,
+      () => ctx.systemPrompt.section({ name: `${name}:style`, order: STYLE_SECTION_ORDER, text: styleText }),
+      `register system prompt section ${name}:style`,
     );
   }
+  if (styleText === '') return;
+  ctx.effect(
+    () => ctx.on('agent/created', ({ agent, source }) => {
+      if (!ANNOUNCE_SOURCES.has(source)) return;
+      const message = createUserMessage({
+        content: [{
+          type: 'text',
+          text: `Session style instructions (injected by the "${name}" plugin; they apply to this whole session):\n\n${styleText}`,
+        }],
+        source: { kind: name },
+      });
+      try {
+        agent.session.append('user/message', message, { surfaceOp: 'append' });
+      } catch {
+        // session append rejected (format/policy change): keep the rules durable but transcript-invisible
+        agent.inject(message);
+      }
+    }),
+    `announce ${name} style on agent/created`,
+  );
 }
 
 export { name, inject };
