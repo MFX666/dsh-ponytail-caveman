@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "会话提示词注入",
+    "description": "向每个会话的系统提示词注入工作风格提示：ponytail（懒高级开发）与 caveman（极简输出），各自支持 off/lite/full/ultra 等级，在 profile 配置中修改。"
+  }
+}

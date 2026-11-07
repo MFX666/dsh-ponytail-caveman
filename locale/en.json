@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Session prompts",
+    "description": "Injects working-style prompts into every session's system prompt: ponytail (lazy senior dev) and caveman (terse output), each with off/lite/full/ultra levels configured in the profile patch."
+  }
+}
