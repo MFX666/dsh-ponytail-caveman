@@ -9,12 +9,9 @@
 
 ## 工作原理
 
-插件通过两层机制注入，模仿参考插件的 SessionStart hook 行为：
+插件通过 `ctx.systemPrompt.section()` 注册 `dsh-ponytail-caveman:style`（排序 450，位于 persona 之后、plan policy 之前），每次模型请求前重新组装——所有 Agent（根会话与子 Agent）生效，且即使长会话 compaction 折叠了早期消息，风格规则依然生效。
 
-1. **轨迹可见消息**：监听 `agent/created`（新会话、clear、compaction 时机），向会话日志提交一条 `user/message`（来源标记 `dsh-ponytail-caveman`），它会出现在对话轨迹顶部，并进入模型的第一步请求。resume 不重复注入（早先的消息仍在日志里）。
-2. **系统提示词 section**：通过 `ctx.systemPrompt.section()` 注册 `dsh-ponytail-caveman:style`（排序 450，位于 persona 之后、plan policy 之前），每次模型请求前重新组装——即使长会话 compaction 折叠了第 1 条消息，风格规则依然生效。
-
-两者对当前进程内所有 Agent（根会话与子 Agent）生效；修改配置后插件重启，对新会话和已有会话即时生效，无需重启。
+早期版本还曾在 `agent/created` 时向会话轨迹注入一条可见 user/message，但该消息在 orca-worktree 等 worker 会话流程中可能先于受保护的 system head 被持久化，污染 v4 会话日志（下次打开报 "requires a protected first surface head"）。该层已移除：section 在每次请求中生效且不写 surface 记录，功能上完全覆盖它。
 
 ## 配置
 
@@ -82,7 +79,7 @@ plugin_manager install_bundle target=<本目录绝对路径>
 ```
 package.json       bundle 清单（dsh.bundle.patch + dsh.client 声明）
 cordis.patch.yml   插入 dsh-ponytail-caveman 行及默认配置
-index.js           Host 插件：Config schema + section 注册 + 会话起始消息 + 配置路由
+index.js           Host 插件：Config schema + section 注册 + 配置路由
 client.js          插件详情页配置面板（plugins.bundle.config，同 voice-input 范式）
 locale/en.json     英文标题/描述（Plugin Manager 显示）
 locale/zh.json     中文标题/描述

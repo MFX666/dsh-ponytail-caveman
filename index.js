@@ -8,19 +8,20 @@
  * - pi-caveman (https://github.com/jonjonrankin/pi-caveman) — "caveman": terse output that
  *   keeps technical substance while cutting filler tokens.
  *
- * Mechanism: two layers.
- * - `ctx.systemPrompt.section()` registers ordered sections, so the text is
- *   re-assembled into every model request of every agent (root sessions and
- *   subagents alike) and survives compaction.
- * - An `agent/created` listener commits a visible `user/message` at session
- *   start (fresh creation, clear, compaction — not resume, where the earlier
- *   message is already durable), so the injection appears in the session
- *   trajectory. If that append is rejected, it degrades to `agent.inject()`,
- *   which is durable but transcript-invisible.
+ * Mechanism: a single `ctx.systemPrompt.section()` registers an ordered
+ * section, so the text is re-assembled into every model request of every agent
+ * (root sessions and subagents alike) and survives compaction.
+ *
+ * A former second layer announced the style as a visible `user/message` via
+ * `agent.inject()` on `agent/created`. It is removed: in fast worker-session
+ * flows (orca-worktree sessions, `.agents` workers) the injected message could
+ * be persisted before the protected system head, poisoning the v4 session log
+ * ("requires a protected first surface head" on next launch). The section is
+ * strictly stronger — it reaches every request without writing surface
+ * records — so only it remains.
  * A level change in the profile patch restarts the plugin and applies to
  * existing and future sessions without restart.
  */
-import { createUserMessage } from '@deepseek-ai/dsh-llm';
 import z from '@deepseek-ai/schemastery';
 
 const name = 'dsh-ponytail-caveman';
@@ -143,9 +144,6 @@ ${CAVEMAN_SAFETY}`;
 const PONYTAIL_PROMPTS = { lite: PONYTAIL_LITE, full: PONYTAIL_FULL, ultra: PONYTAIL_ULTRA };
 const CAVEMAN_PROMPTS = { lite: CAVEMAN_LITE, full: CAVEMAN_FULL, ultra: CAVEMAN_ULTRA };
 
-/** Session-start sources that (re-)announce the style message; `resume` is skipped because the earlier message is still durable in the log. */
-const ANNOUNCE_SOURCES = new Set(['startup', 'clear', 'compaction']);
-
 /** Read one JSON request body with a size guard. */
 const readBody = (req) => new Promise((resolve, reject) => {
   const chunks = [];
@@ -182,25 +180,6 @@ export function apply(ctx, config) {
     );
   }
   if (styleText === '') return;
-  ctx.effect(
-    () => ctx.on('agent/created', ({ agent, source }) => {
-      if (!ANNOUNCE_SOURCES.has(source)) return;
-      const message = createUserMessage({
-        content: [{
-          type: 'text',
-          text: `Session style instructions (injected by the "${name}" plugin; they apply to this whole session):\n\n${styleText}`,
-        }],
-        source: { kind: name },
-      });
-      try {
-        agent.session.append('user/message', message, { surfaceOp: 'append' });
-      } catch {
-        // session append rejected (format/policy change): keep the rules durable but transcript-invisible
-        agent.inject(message);
-      }
-    }),
-    `announce ${name} style on agent/created`,
-  );
   ctx.effect(
     () => ctx.webServer.register({
       kind: 'prefix',
