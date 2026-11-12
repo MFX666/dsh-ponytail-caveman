@@ -1,6 +1,6 @@
 # dsh-ponytail-caveman
 
-一个 DSH（DeepSeek Harness）Host 插件：在**每个会话开始时向系统提示词注入工作风格提示**，相当于其他 Agent 工具里的 SessionStart hook。
+一个 DSH（DeepSeek Harness）Host 插件：在**每个会话开始时以运行时上下文快照（`<system-reminder>`）注入工作风格提示**，相当于其他 Agent 工具里的 SessionStart hook。系统提示词保持原样，轨迹里能看到独立的一条注入行。
 
 灵感来源（均为在 session 启动时注入提示词的插件）：
 
@@ -9,9 +9,11 @@
 
 ## 工作原理
 
-插件通过 `ctx.systemPrompt.section()` 注册 `dsh-ponytail-caveman:style`（排序 450，位于 persona 之后、plan policy 之前），每次模型请求前重新组装——所有 Agent（根会话与子 Agent）生效，且即使长会话 compaction 折叠了早期消息，风格规则依然生效。
+插件通过 `ctx.systemPrompt.context()` 注册 `dsh-ponytail-caveman:style`（快照内排序 450，位于 persona 之后、plan policy 之前）。Agent loop 把它折进标准的 `<system-reminder>` 快照——loop 托管的 user/message，在步骤准入时提交，轨迹中是一行独立可见的注入记录；系统提示词完全不动。所有 Agent（根会话与子 Agent）拿到同一份快照。`required: true` 使它免受 `suppressRuntimeContext()` 屏蔽；`interpolate: false` 使自定义文本中的 `{{...}}` 按字面保留。
 
-早期版本还曾在 `agent/created` 时向会话轨迹注入一条可见 user/message，但该消息在 orca-worktree 等 worker 会话流程中可能先于受保护的 system head 被持久化，污染 v4 会话日志（下次打开报 "requires a protected first surface head"）。该层已移除：section 在每次请求中生效且不写 surface 记录，功能上完全覆盖它。
+注意 compaction 权衡：快照仅在文本变化时写入一次，长会话折叠历史后，风格规则在摘要中保留；文本下次变化（改档位/自定义文本）时会重新断言。早期用 `systemPrompt.section()` 时规则随每次请求重组、对 compaction 天然免疫——换成快照形式是为了轨迹可见性与不动系统提示词。
+
+早期版本还曾在 `agent/created` 时通过 `agent.inject()` 向会话轨迹注入一条 user/message，但在 orca-worktree 等 worker 会话流程中可能先于受保护的 system head 被持久化，污染 v4 会话日志（下次打开报 "requires a protected first surface head"）。该层已移除。现在的快照由 loop 在正确的步骤边界提交（DSH 自身的 cwd/时间上下文同走此路径），时序安全，且自带取代语义（"replaces earlier versions…"）。
 
 ## 配置
 
@@ -79,7 +81,7 @@ plugin_manager install_bundle target=<本目录绝对路径>
 ```
 package.json       bundle 清单（dsh.bundle.patch + dsh.client 声明）
 cordis.patch.yml   插入 dsh-ponytail-caveman 行及默认配置
-index.js           Host 插件：Config schema + section 注册 + 配置路由（仅限 loopback 访问）
+index.js           Host 插件：Config schema + runtime context 注册 + 配置路由（仅限 loopback 访问）
 client.js          插件详情页配置面板（plugins.bundle.config，同 voice-input 范式）
 locale/en.json     英文标题/描述（Plugin Manager 显示）
 locale/zh.json     中文标题/描述

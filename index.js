@@ -8,17 +8,26 @@
  * - pi-caveman (https://github.com/jonjonrankin/pi-caveman) — "caveman": terse output that
  *   keeps technical substance while cutting filler tokens.
  *
- * Mechanism: a single `ctx.systemPrompt.section()` registers an ordered
- * section, so the text is re-assembled into every model request of every agent
- * (root sessions and subagents alike) and survives compaction.
+ * Mechanism: a single `ctx.systemPrompt.context()` registers the style as a
+ * named runtime-context contribution. The loop folds it into the standard
+ * `<system-reminder>` snapshot — a loop-owned user/message committed at step
+ * admission, visible as its own row in the session trace — and leaves the
+ * system prompt untouched. Every agent (root sessions and subagents alike)
+ * gets the same snapshot. `required: true` survives suppressRuntimeContext();
+ * `interpolate: false` keeps text literal even when custom rules contain
+ * `{{...}}`.
  *
- * A former second layer announced the style as a visible `user/message` via
- * `agent.inject()` on `agent/created`. It is removed: in fast worker-session
- * flows (orca-worktree sessions, `.agents` workers) the injected message could
+ * Tradeoff vs the former `systemPrompt.section()` placement (removed): the
+ * snapshot is written once per text change, so after compaction the rules
+ * survive only inside the summary until the text next changes. Kept anyway:
+ * the visible trace row and untouched system prompt are the point.
+ *
+ * A former `agent.inject()` layer is removed: in fast worker-session flows
+ * (orca-worktree sessions, `.agents` workers) the injected message could
  * be persisted before the protected system head, poisoning the v4 session log
- * ("requires a protected first surface head" on next launch). The section is
- * strictly stronger — it reaches every request without writing surface
- * records — so only it remains.
+ * ("requires a protected first surface head" on next launch). The loop-owned
+ * snapshot commits at proper step boundaries, so it is safe where that layer
+ * was not.
  * A level change in the profile patch restarts the plugin and applies to
  * existing and future sessions without restart.
  */
@@ -31,7 +40,7 @@ const ROUTE_PREFIX = '/api/dsh-ponytail-caveman'; // no trailing slash: the webs
 const LEVELS = new Set(['off', 'lite', 'full', 'ultra']);
 const MAX_TEXT_CHARS = 20000;
 
-/** Section placement: after deployment persona (0), before plan policy (500). */
+/** Snapshot order: after deployment persona (0), before plan policy (500). */
 const STYLE_SECTION_ORDER = 450;
 
 export const Config = z.object({
@@ -175,8 +184,14 @@ export function apply(ctx, config) {
   ].filter(Boolean).join('\n\n');
   if (styleText !== '') {
     ctx.effect(
-      () => ctx.systemPrompt.section({ name: `${name}:style`, order: STYLE_SECTION_ORDER, text: styleText }),
-      `register system prompt section ${name}:style`,
+      () => ctx.systemPrompt.context({
+        name: `${name}:style`,
+        order: STYLE_SECTION_ORDER,
+        text: styleText,
+        required: true, // survive suppressRuntimeContext()
+        interpolate: false, // literal text: custom rules may contain {{...}}
+      }),
+      `register runtime context ${name}:style`,
     );
   }
   if (styleText === '') return;
